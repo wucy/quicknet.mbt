@@ -16,12 +16,12 @@ exec_prefix='${prefix}'
 
 # String to pass to linker to pick up the QuickNet library from its
 # installed directory, along with any other required libraries.
-QN_BUILD_LIB_SPEC="-L/home/mifs/cw564/code/quicknet-v3_40pre1-DNN.Tandem-cuda5.5 -lquicknet3 -lpthread -lm "
-QN_INSTALL_LIB_SPEC="-L${libdir} -lquicknet3 -lpthread -lm "
+QN_BUILD_LIB_SPEC="-L/home/mifs/cw564/src/quicknet.mbt -lquicknet3 -lpthread -lm -lcublas -lcudart "
+QN_INSTALL_LIB_SPEC="-L${libdir} -lquicknet3 -lpthread -lm -lcublas -lcudart "
 QN_LIB_SPEC=${QN_BUILD_LIB_SPEC}
 
 # Location of the installed include headers directory fltvec.
-QN_BUILD_INC_SPEC="-I/home/mifs/cw564/code/quicknet-v3_40pre1-DNN.Tandem-cuda5.5 -I/home/mifs/cw564/code/quicknet-v3_40pre1-DNN.Tandem-cuda5.5"
+QN_BUILD_INC_SPEC="-I/home/mifs/cw564/src/quicknet.mbt -I/home/mifs/cw564/src/quicknet.mbt"
 QN_INSTALL_INC_SPEC="-I${exec_prefix}/include/quicknet3"
 QN_INC_SPEC=${QN_BUILD_INC_SPEC}
 
@@ -32,6 +32,6 @@ QN_CXX='g++'
 QN_CPPFLAGS=''
 QN_CFLAGS='-g -O2'
 QN_CXXFLAGS='-g -O2'
-QN_LD_FLAGS=''
+QN_LD_FLAGS='-L/usr/local/cuda-5.5/lib -Wl,-rpath=/usr/local/cuda-5.5/lib -L/usr/local/cuda-5.5/lib64 -Wl,-rpath=/usr/local/cuda-5.5/lib64 '
 
 

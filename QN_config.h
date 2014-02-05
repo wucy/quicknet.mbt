@@ -5,7 +5,7 @@
 /* #undef AC_APPLE_UNIVERSAL_BUILD */
 
 /* have CUDA functionality */
-/* #undef CUDA */
+#define QN_CUDA /**/
 
 /* Define to 1 if you have the <acml.h> header file. */
 /* #undef HAVE_ACML_H */

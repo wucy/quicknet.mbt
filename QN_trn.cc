@@ -15,6 +15,41 @@ const char* QN_trn_rcsid =
 #include "QN_fltvec.h"
 #include "QN_MLPWeightFile_RAP3.h"
 
+
+
+//cw564 - mbt
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <map>
+#include <string>
+#include <stdio.h>
+using std::ifstream;
+using std::cin;
+using std::cerr;
+using std::cout;
+using std::map;
+using std::string;
+using std::vector;
+using std::endl;
+
+//cw564 - mbt -- decode the modified lab buffer and generate right lab_buf and spkr_wgt per frame
+void
+QN_HardSentTrainer::convert_raw_lab_buf(QNUInt32 * lab_buf, float ** spkr_wgt_buf, const int count)
+{
+    for (int i = 0; i < count; ++ i)
+    {
+        int segid = lab_buf[i] / mbt_params.lab_offset;
+        lab_buf[i] %= mbt_params.lab_offset;
+
+        spkr_wgt_buf[i] = mbt_params.seg2spkrwgt(segid);
+    }
+
+}
+
+
+
+
 // "Hard training" object - trains using labels to indicate targets.
 
 QN_HardSentTrainer::QN_HardSentTrainer(int a_debug, const char* a_dbgname,
@@ -33,7 +68,9 @@ QN_HardSentTrainer::QN_HardSentTrainer(int a_debug, const char* a_dbgname,
 				       unsigned long a_ckpt_secs,
 				       size_t a_bunch_size,
 				       int a_lastlab_reject,
-				       float* a_lrscale)
+				       float* a_lrscale,
+                                       const MBT_Params * a_mbt_params //cw564 - mbt
+                                       )
     : debug(a_debug),
       dbgname(a_dbgname),
       clog(a_debug, "QN_HardSentTrainer", a_dbgname),
@@ -66,7 +103,8 @@ QN_HardSentTrainer::QN_HardSentTrainer(int a_debug, const char* a_dbgname,
       ckpt_format(a_ckpt_format),
       ckpt_secs(a_ckpt_secs),
       last_ckpt_time(time(NULL)),
-      pid(getpid())
+      pid(getpid()),
+      mbt_params(*a_mbt_params) //cw564 - mbt
 {
 // Perform some checks of the input data.
     assert(bunch_size!=0);
@@ -136,8 +174,9 @@ QN_HardSentTrainer::~QN_HardSentTrainer()
     delete[] lab_buf;
 }
 
+
 void
-QN_HardSentTrainer::train(const char *lr_ctr, struct MapStruct *mapptr)	//cz277 - outmap	//cz277 - learn rate criterion
+QN_HardSentTrainer::train(const char *lr_ctr, struct MapStruct *mapptr, bool if_mbt)	//cz277 - outmap	//cz277 - learn rate criterion
 {
     double run_start_time;	// Time we started.
     double run_stop_time;	// Time we stopped.
@@ -269,7 +308,7 @@ QN_HardSentTrainer::train(const char *lr_ctr, struct MapStruct *mapptr)	//cz277 
 // Note - cross validation is less demanding on the facilities that
 // must be provided by the stream.
 double
-QN_HardSentTrainer::cv_epoch(const char *lr_ctr, struct MapStruct *mapptr)	//cz277 - outmap	//cz277 - learn rate criterion
+QN_HardSentTrainer::cv_epoch(const char *lr_ctr, struct MapStruct *mapptr, bool if_mbt)	//cz277 - outmap	//cz277 - learn rate criterion
 {
     size_t ftr_count;		// Count of feature frames read.
     size_t lab_count;		// Count of label frames read.
@@ -313,15 +352,27 @@ QN_HardSentTrainer::cv_epoch(const char *lr_ctr, struct MapStruct *mapptr)	//cz2
 	// Get the data to pass on to the net.
 	ftr_count = cv_ftr_str->read_ftrs(bunch_size, inp_buf);
 	lab_count = cv_lab_str->read_labs(bunch_size, lab_buf);
-	if (ftr_count!=lab_count)
+        
+
+        if (ftr_count!=lab_count)
 	{
 	    clog.error("Feature and label streams have different segment "
 		       "lengths in cross validation.");
 	}
+        
+        //cw564 - mbt
+        //cerr << lab_buf[0] << endl;
+        float* * spkr_wgt_buf = new float*[lab_count];
+        convert_raw_lab_buf(lab_buf, spkr_wgt_buf, lab_count);
+        //cerr << lab_buf[0] << '\t' << spkr_wgt_buf[0]  << '\t' 
+        //    << spkr_wgt_buf[0][0] << '\t' << spkr_wgt_buf[0][1] << endl; exit(0);
+
 
 	// Do the forward pass.
 	mlp->forward(ftr_count, inp_buf, out_buf);
 	
+        delete [] spkr_wgt_buf;
+
 	// Analyze the output of the net.
 	float* out_buf_ptr = out_buf; // Current output frame.
 	QNUInt32* lab_buf_ptr = lab_buf; // Current label.
@@ -420,7 +471,7 @@ QN_HardSentTrainer::cv_epoch(const char *lr_ctr, struct MapStruct *mapptr)	//cz2
 }
 
 double
-QN_HardSentTrainer::train_epoch(struct MapStruct *mapptr)
+QN_HardSentTrainer::train_epoch(struct MapStruct *mapptr, bool if_mbt) //cw564 - mbt
 {
     size_t ftr_count;		// Count of feature frames read.
     size_t lab_count;		// Count of label frames read.
@@ -497,6 +548,11 @@ QN_HardSentTrainer::train_epoch(struct MapStruct *mapptr)
 	    clog.error("Feature and label streams have different segment "
 		       "lengths in cross validation.");
 	}
+        
+        //cw564 - mbt
+        float* * spkr_wgt_buf = new float*[lab_count];
+        convert_raw_lab_buf(lab_buf, spkr_wgt_buf, lab_count);
+
 
 	// Check that the label stream is good and build up the target vector.
 	qn_copy_f_vf(ftr_count*mlp_outs, targ_low, targ_buf);
@@ -1171,4 +1227,6 @@ QN_SoftSentTrainer::checkpoint_weights()
 			 ckpt_filename, ckpt_format, QN_WRITE);
 
 }
+
+
 

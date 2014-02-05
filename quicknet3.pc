@@ -1,11 +1,11 @@
-prefix=/home/mifs/cw564/code/quicknet-v3_40pre1-DNN.Tandem-cuda5.5
+prefix=/home/mifs/cw564/src/quicknet.mbt
 exec_prefix=${prefix}
 libdir=${prefix}
-includedir=/home/mifs/cw564/code/quicknet-v3_40pre1-DNN.Tandem-cuda5.5
+includedir=/home/mifs/cw564/src/quicknet.mbt
 
 Name: QuickNet
 Description: QuickNet MLP Training Program and Library (uninstalled)
 Version: v3_40pre1
 Requires: 
-Libs: -L${libdir}  -lquicknet3 -lpthread -lm 
+Libs: -L${libdir} -L/usr/local/cuda-5.5/lib -Wl,-rpath=/usr/local/cuda-5.5/lib -L/usr/local/cuda-5.5/lib64 -Wl,-rpath=/usr/local/cuda-5.5/lib64  -lquicknet3 -lpthread -lm -lcublas -lcudart 
 Cflags: -I${libdir} -I${includedir} -g -O2 

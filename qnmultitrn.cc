@@ -26,6 +26,66 @@ const char* qnmultitrn_rcsid =
 #endif
 #include <unistd.h>
 
+
+
+//cw564 - mbt
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <map>
+#include <string>
+#include <stdio.h>
+using std::ifstream;
+using std::cin;
+using std::cerr;
+using std::cout;
+using std::map;
+using std::string;
+using std::vector;
+using std::endl;
+
+
+//cw564 - mbt
+map<string, float *> gen_spkwgt(const char * fn)
+{
+    map<string, float *> ret;
+    ifstream ifs(fn);
+    int n, dim;
+    ifs >> n >> dim;
+    for (int i = 0; i < n; ++ i)
+    {
+        char name[1000];
+        ifs >> name;
+        float * vect = new float[100];
+        for (int j = 0; j < dim; ++ j)
+        {
+            ifs >> vect[j];
+        }
+        ret[name] = vect;
+    }
+    ifs.close();
+    return ret;
+}
+
+map<int, string> gen_seg2spk(const char * fn)
+{
+    map<int ,string> ret;
+    int n;
+    ifstream ifs(fn);
+    ifs >> n;
+    for (int i = 0; i < n; ++ i)
+    {
+        int segid;
+        char buf[1000];
+        ifs >> segid >> buf;
+        ret[segid] = buf;
+    }
+    ifs.close();
+    return ret;
+}
+
+
+
 #if !QN_HAVE_DECL_SRAND48
 extern "C" {
 void srand48(long);
@@ -146,6 +206,17 @@ static struct {
     const char *env_var4dev_id;
     //cz277 - weight decay
     float weight_decay_factor;
+
+
+    //cw564 - mbt -- number of basis
+    int mbt_num_basis;
+    //cw564 - mbt -- init spkr lambda file
+    const char * mbt_init_lambda_file;
+    //cw564 - mbt -- prefix of out lambda file (per iter)
+    const char * mbt_out_lambda_file_prefix;
+    //cw564 - mbt -- segid to spkrid map file
+    const char * mbt_seg2spkr_file;
+
 } config;
 
 static void
@@ -276,6 +347,15 @@ set_defaults(void)
     config.env_var4dev_id = "X_SGE_CUDA_DEVICE";
     //cz277 - weight decay
     config.weight_decay_factor = 0.0;
+
+    //cw564 - mbt -- number of basis
+    config.mbt_num_basis = 1;
+    //cw564 - mbt -- init spkr lambda file
+    config.mbt_init_lambda_file = "";
+    //cw564 - mbt -- prefix of out lambda file (per iter)
+    config.mbt_out_lambda_file_prefix = "";
+    //cw564 - mbt -- segid to spkrid map file
+    config.mbt_seg2spkr_file = "";
 }
 
 QN_ArgEntry argtab[] =
@@ -453,6 +533,14 @@ QN_ArgEntry argtab[] =
 { "env_var4dev_id", "The environment variable indicating the right GPU device to use, set by SGE", QN_ARG_STR, &(config.env_var4dev_id) },
 //cz277 - weight decay
 { "weight_decay_factor", "The weight decay factor", QN_ARG_FLOAT, &(config.weight_decay_factor) },
+
+//cw564 - mbt
+{ "mbt_num_basis", "[MBT] number of basis", QN_ARG_INT, &(config.mbt_num_basis) },
+{ "mbt_init_lambda_file", "[MBT] init lambda file", QN_ARG_STR, &(config.mbt_init_lambda_file) },
+{ "mbt_out_lambda_file_prefix", "[MBT] prefix of out lambda file (per iter)", 
+    QN_ARG_STR, &(config.mbt_out_lambda_file_prefix) },
+{ "mbt_seg2spkr_file", "[MBT] segid to spkrid map file", QN_ARG_STR, &(config.mbt_seg2spkr_file) },
+
 { NULL, NULL, QN_ARG_NOMOREARGS }  
 };
 
@@ -1510,9 +1598,17 @@ qnmultitrn()
 	QN_ERROR(NULL, "bad map_file_path '%s'.", config.map_file_path);
     } 
 
+    
+
     if (hardtarget_train_str!=NULL)
     {
 	assert(hardtarget_cv_str!=NULL);
+        
+        //cw564 - mbt
+        map< string, float* > spkr_wgt = gen_spkwgt(config.mbt_init_lambda_file);
+        map< int, string > seg2spkr = gen_seg2spk(config.mbt_seg2spkr_file);
+        //cerr << spkr_wgt[seg2spkr[1]][0] << endl; exit(0);
+        MBT_Params mbt_params(seg2spkr, spkr_wgt, config.mbt_num_basis);
 	QN_HardSentTrainer* trainer =
 	    new QN_HardSentTrainer(debug,               // Debugging level.
 				   "trainer",           // Debugging tag.
@@ -1532,7 +1628,8 @@ qnmultitrn()
 				   ckpt_seconds,
 				   train_chunk_size, // Batch size.
 				   lastlab_reject,  // Allow untrainable frames
-				   lrmultipliers         // Per-section LR scales.
+				   lrmultipliers,         // Per-section LR scales.
+                                   &mbt_params   //cw564 - mbt
 			       );
 	trainer->train(config.lr_ctr, &mapclass);	//cz277 - outmap
 	delete trainer;

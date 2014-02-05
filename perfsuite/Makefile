@@ -48,8 +48,8 @@ RUNFLAGS =
 CPPFLAGS = 
 CFLAGS = -g -O2
 CXXFLAGS = -g -O2
-LDFLAGS = 
-LIBS = -lpthread -lm 
+LDFLAGS = -L/usr/local/cuda-5.5/lib -Wl,-rpath=/usr/local/cuda-5.5/lib -L/usr/local/cuda-5.5/lib64 -Wl,-rpath=/usr/local/cuda-5.5/lib64 
+LIBS = -lpthread -lm -lcublas -lcudart 
 INCS = 
 
 cflags = -I$(top_builddir) -I$(top_srcdir) $(CFLAGS) $(CPPFLAGS)

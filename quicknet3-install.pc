@@ -7,5 +7,5 @@ Name: QuickNet
 Description: QuickNet MLP Training Program and Library
 Version: v3_40pre1
 Requires: 
-Libs: -L${libdir}  -lquicknet3 -lpthread -lm 
+Libs: -L${libdir} -L/usr/local/cuda-5.5/lib -Wl,-rpath=/usr/local/cuda-5.5/lib -L/usr/local/cuda-5.5/lib64 -Wl,-rpath=/usr/local/cuda-5.5/lib64  -lquicknet3 -lpthread -lm -lcublas -lcudart 
 Cflags: -I${includedir}/quicknet3 -g -O2 

@@ -65,8 +65,8 @@ CPPFLAGS =
 CFLAGS = -g -O2
 CXXFLAGS = -g -O2
 NVCCFLAGS = 
-LDFLAGS = 
-LIBS = -lpthread -lm 
+LDFLAGS = -L/usr/local/cuda-5.5/lib -Wl,-rpath=/usr/local/cuda-5.5/lib -L/usr/local/cuda-5.5/lib64 -Wl,-rpath=/usr/local/cuda-5.5/lib64 
+LIBS = -lpthread -lm -lcublas -lcudart 
 INCS = 
 
 cflags = -I$(builddir) -I$(srcdir) $(CFLAGS) $(CPPFLAGS)
@@ -322,7 +322,7 @@ qnlib_cuda_objs = \
 	QN_CudaUtils.o \
 	QN_MLP_BunchCudaVar.o
 
-qnlib_opt_objs = 
+qnlib_opt_objs =  $(qnlib_cuda_objs)
 qnlib_objs = $(qnlib_core_objs) $(qnlib_opt_objs)
 
 qnlib_shobjs = \

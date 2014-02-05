@@ -18,6 +18,48 @@
 
 // A class for performing MLP training with hard targets.
 
+//cw564 - mbt
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <map>
+#include <string>
+#include <stdio.h>
+using std::ifstream;
+using std::cin;
+using std::cerr;
+using std::cout;
+using std::map;
+using std::string;
+using std::vector;
+using std::endl;
+
+//cw564 - mbt -- mbt parameters
+struct MBT_Params
+{
+    QNUInt32 lab_offset;
+    map< int, string > seg2spkr;
+    map<string, float*> spkr2wgt;
+    QNUInt32 num_basis;
+
+    MBT_Params(const map< int, string > & a_seg2spkr, const map<string, float*> & a_spkr2wgt, 
+        const int a_num_basis, const QNUInt32 a_lab_offset = 10000)
+    {
+        lab_offset = a_lab_offset;
+        seg2spkr = a_seg2spkr;
+        spkr2wgt = a_spkr2wgt;
+        num_basis = a_num_basis;
+    }
+
+    float* seg2spkrwgt(int segid)
+    {
+        if (seg2spkr.find(segid) == seg2spkr.end()) return NULL;
+        string spkr_id = seg2spkr[segid];
+        if (spkr2wgt.find(spkr_id) == spkr2wgt.end()) return NULL;
+        return spkr2wgt[spkr_id];
+    }
+};
+
 class QN_HardSentTrainer
 {
 public:
@@ -36,11 +78,15 @@ public:
 		       unsigned long a_ckpt_secs,
 		       size_t a_bunch_size,
 		       int a_lastlab_reject = 0,
-		       float* a_lrscale = NULL);
+		       float* a_lrscale = NULL,
+                       const MBT_Params * a_mbt_params = NULL //cw564 - mbt
+                       );
     ~QN_HardSentTrainer();
     // Actually do training.
-    void train(const char *, struct MapStruct *);	//cz277 - outmap	//cz277 - learn rate criterion
+    //cw564 - mbt - modified interface with mbt switch (if_mbt)
+    void train(const char *, struct MapStruct *, bool if_mbt = false);	//cz277 - outmap	//cz277 - learn rate criterion
 
+    
 protected:
     int debug;
     const char* dbgname;
@@ -87,13 +133,18 @@ protected:
     float lrscale[QN_MLP_MAX_LAYERS-1];	// Learning scale values for each sect.
     size_t epoch;		// Current epoch.
 
+    //cw564 - mbt - modified interface with mbt switch (if_mbt)
 // Local functions.
-    double cv_epoch(const char *, struct MapStruct *);		// Do one epochs worth of cross validation.	//cz277 - outmap	//cz277 - learn rate criterion
-    double train_epoch(struct MapStruct *mapptr);	// Do one epochs worth of training.	//cz277 - outmap
+    double cv_epoch(const char *, struct MapStruct *, bool if_mbt = false);		// Do one epochs worth of cross validation.	//cz277 - outmap	//cz277 - learn rate criterion
+    double train_epoch(struct MapStruct *mapptr, bool if_mbt = false);	// Do one epochs worth of training.	//cz277 - outmap
     void set_learnrate();	// Set the learning rates in the net based
 				// on the value of learn_rate.
     void checkpoint_weights();	// Dump a checkpoint of the weights.
 
+
+    MBT_Params mbt_params; //cw564 - mbt -- mbt parameters
+    //cw564 - mbt -- decode the modified lab buffer and generate right lab_buf and spkr_wgt per frame
+    void convert_raw_lab_buf(QNUInt32 * lab_buf, float ** spkr_wgt_buf, const int count);
 };
 
 // A class for performing MLP training with soft targets.
@@ -168,6 +219,8 @@ protected:
     void set_learnrate();	// Set the learning rates in the net based
 				// on the value of learn_rate.
     void checkpoint_weights();	// Dump a checkpoint of the weights.
+
+    
 };
 
 // A class for performing MLP training with soft targets.
