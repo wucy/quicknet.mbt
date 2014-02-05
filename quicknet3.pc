@@ -1,0 +1,11 @@
+prefix=/home/mifs/cw564/code/quicknet-v3_40pre1-DNN.Tandem-cuda5.5
+exec_prefix=${prefix}
+libdir=${prefix}
+includedir=/home/mifs/cw564/code/quicknet-v3_40pre1-DNN.Tandem-cuda5.5
+
+Name: QuickNet
+Description: QuickNet MLP Training Program and Library (uninstalled)
+Version: v3_40pre1
+Requires: 
+Libs: -L${libdir}  -lquicknet3 -lpthread -lm 
+Cflags: -I${libdir} -I${includedir} -g -O2 

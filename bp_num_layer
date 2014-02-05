@@ -1,0 +1,5 @@
+QN_MLP_BaseFl.h:    void set_alpha_momentum(float a_alpha_momentum) { this->alpha_momentum = a_alpha_momentum; };
+QN_MLP_BunchCudaVar.cu:    int bp_num_layer_idx = this->bp_num_layer;
+QN_MLP_BunchFlVar.cc:    for (cur_layer=n_layers-1; cur_layer>0 && (this->bp_num_layer != 0); cur_layer--, --this->bp_num_layer)	//cz277 - nn fea bp
+QN_MLP_ThreadFlVar.cc:    for (layer = n_layers-1; layer>0 && (this->bp_num_layer != 0); layer--, --this->bp_num_layer)	//cz277 - nn fea bp
+QN_RateSchedule.cc:                if (epoch >= this->min_iter_num)    //cz277 - newbob
