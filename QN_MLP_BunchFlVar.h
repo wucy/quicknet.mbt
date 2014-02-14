@@ -27,11 +27,13 @@ public:
 
 protected:
     // Forward pass one frame
-    void forward_bunch(size_t n_frames, const float* in, float* out);
+    void forward_bunch(size_t n_frames, const float* in, float* out, 
+            const float * * spkr_wgt = NULL, const size_t num_basis = 1); //cw564 - mbt
 
     // Train one frame
     void train_bunch(size_t n_frames, const float* in, const float* target,
-		     float* out);
+		     float* out,
+                     const float * * spkr_wgt = NULL, const size_t num_basis = 1); //cw564 - mbt
     
 private:
 

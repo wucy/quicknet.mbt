@@ -94,7 +94,7 @@ public:
     size_t num_sections() const { return 4; };
     size_t size_layer(QN_LayerSelector layer) const;
     void size_section(QN_SectionSelector section, size_t* ouput_p,
-		      size_t* input_p) const;
+		      size_t* input_p, size_t num_basis) const; //cw564 - mbt
 
     size_t num_connections() const;
     // Find out the bunch size (not part of the abstract interface)

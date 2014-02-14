@@ -1122,14 +1122,14 @@ qnmultitrn()
 #endif
 
 
-
-    if (ftrfile_num_input!=mlp_input_size)
+    //cw564 - mbt -- TODO
+    /*if (ftrfile_num_input!=mlp_input_size)
     {
 	QN_ERROR(NULL, "number of inputs to the net (%lu) does not equal width"
 		 " of data stream from feature files (%lu).",
 		 (unsigned long) mlp_input_size, 
 		 (unsigned long) ftrfile_num_input);
-    }
+    }*/
     
 
     // Sentence and randomization details.
@@ -1315,6 +1315,10 @@ qnmultitrn()
 	       config.mlp_output_type, config.mlp_hidden_type,	//cz277 - nonlinearity
 	       config.mlp_bunch_size, config.mlp_threads, config.use_cuda,
 	       config.use_fe, &mlp, config.backprop_criterion);	//cz277 - criteria
+    
+    mlp->mbt_num_basis = config.mbt_num_basis; //cw564 - mbt
+
+    //cerr << "!!!" << endl; exit(0);
 
     // Create the leaning rate schedule.
     QN_RateSchedule* lr_schedule;
@@ -1507,7 +1511,7 @@ qnmultitrn()
 	else
 	    QN_ERROR(NULL, "unknown init_weight_format '%s'.",
 		     config.init_weight_format);
-	QN_read_weights(*inwfile, *mlp, &min, &max, debug, "init_weight_file");
+	QN_read_weights(*inwfile, *mlp, &min, &max, debug, "init_weight_file", config.mbt_num_basis);
 	QN_OUTPUT("Weights loaded from file, min=%g max=%g.",
 		  min, max);
 	if (inwfile!=NULL)
@@ -1568,7 +1572,7 @@ qnmultitrn()
 					       out_weight_fp,
 					       QN_WRITE,
 					       mlp_layers,
-					       mlp_layer_size);
+					       mlp_layer_size, config.mbt_num_basis);
     }
     else if (strcmp(config.out_weight_format, "rap3")==0)
     {
@@ -1631,6 +1635,7 @@ qnmultitrn()
 				   lrmultipliers,         // Per-section LR scales.
                                    &mbt_params   //cw564 - mbt
 			       );
+
 	trainer->train(config.lr_ctr, &mapclass);	//cz277 - outmap
 	delete trainer;
     }

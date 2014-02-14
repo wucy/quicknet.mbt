@@ -35,7 +35,7 @@ using std::endl;
 
 //cw564 - mbt -- decode the modified lab buffer and generate right lab_buf and spkr_wgt per frame
 void
-QN_HardSentTrainer::convert_raw_lab_buf(QNUInt32 * lab_buf, float ** spkr_wgt_buf, const int count)
+QN_HardSentTrainer::convert_raw_lab_buf(QNUInt32 * lab_buf, float * * & spkr_wgt_buf, const int count)
 {
     for (int i = 0; i < count; ++ i)
     {
@@ -47,8 +47,43 @@ QN_HardSentTrainer::convert_raw_lab_buf(QNUInt32 * lab_buf, float ** spkr_wgt_bu
 
 }
 
+//cw564 - mbt -- concat the input
+void
+QN_HardSentTrainer::concat_raw_inp_buf(
+        float * input_buf, 
+        const int count,
+        const int raw_fea_dim, 
+        const int num_basis)
+{
+    float * cp_buf = new float[inp_buf_size];
+    
+    //TODO faster memcopy
 
+    for (int i = 0; i < count * raw_fea_dim; ++ i)
+    {
+        cp_buf[i] = input_buf[i];
+    }
 
+    int pos = 0;
+    for (int i = 0; i < count; ++ i)
+    {
+        for (int j = 0; j < num_basis; ++ j)
+        {
+            for (int k = 0; k < raw_fea_dim; ++ k)
+            {
+                input_buf[pos] = cp_buf[i * raw_fea_dim + k];
+                pos ++;
+            }
+        }
+    }
+
+    //cerr << pos << endl;
+    //cerr << input_buf[129];
+    //cerr << cp_buf[129];
+    //exit(0);
+    
+    delete [] cp_buf;
+}
 
 // "Hard training" object - trains using labels to indicate targets.
 
@@ -94,6 +129,7 @@ QN_HardSentTrainer::QN_HardSentTrainer(int a_debug, const char* a_dbgname,
       out_buf(new float[out_buf_size]),
       targ_buf(new float[targ_buf_size]),
       lab_buf(new QNUInt32[bunch_size]),
+      spkr_wgt_buf(new float*[bunch_size]), //cw564 - mbt
       // Copy the template into a new char array.
       wlog_template(strcpy(new char[strlen(a_wlog_template)+1],
 			   a_wlog_template)),
@@ -122,7 +158,7 @@ QN_HardSentTrainer::QN_HardSentTrainer(int a_debug, const char* a_dbgname,
 	    lrscale[i] = 1.0f;
     }
     // Check the input streams.
-    if (train_ftr_str->num_ftrs()!=mlp_inps)
+    /*if (train_ftr_str->num_ftrs()!=mlp_inps)
     {
 	clog.error("The training feature stream has %lu features, the "
 		   "MLP has %lu inputs.",
@@ -135,7 +171,23 @@ QN_HardSentTrainer::QN_HardSentTrainer(int a_debug, const char* a_dbgname,
 		   "MLP has %lu inputs.",
 		   (unsigned long) cv_ftr_str->num_ftrs(),
 		   (unsigned long) mlp_inps);
+    }*/
+    //cw564 - mbt - check input streams modified for mbt
+    if (mlp_inps % train_ftr_str->num_ftrs() != 0)
+    {
+	clog.error("The training feature stream has %lu features, the "
+		   "MLP has %lu inputs.",
+		   (unsigned long) train_ftr_str->num_ftrs(),
+		   (unsigned long) mlp_inps);
     }
+    if (mlp_inps % cv_ftr_str->num_ftrs() != 0)
+    {
+	clog.error("The CV feature stream has %lu features, the "
+		   "MLP has %lu inputs.",
+		   (unsigned long) cv_ftr_str->num_ftrs(),
+		   (unsigned long) mlp_inps);
+    }
+
     if (train_lab_str->num_labs()!=1)
     {
 	clog.error("The train label stream has %lu labels per frame but we "
@@ -172,6 +224,8 @@ QN_HardSentTrainer::~QN_HardSentTrainer()
     delete[] out_buf;
     delete[] targ_buf;
     delete[] lab_buf;
+
+    delete [] spkr_wgt_buf; //cw564 - mbt
 }
 
 
@@ -202,7 +256,7 @@ QN_HardSentTrainer::train(const char *lr_ctr, struct MapStruct *mapptr, bool if_
     QN_timestr(timebuf, sizeof(timebuf));
     if (verbose)
 	QN_OUTPUT("Pre-run cross validation finished: %s.", timebuf);
-
+    //exit(0);
     // Note: to prevent the initial weights being saved as the best weights,
     // we assume the cross validation had abysmal results.  Even if the
     // training makes things worse, the change might be useful and we do not
@@ -214,7 +268,12 @@ QN_HardSentTrainer::train(const char *lr_ctr, struct MapStruct *mapptr, bool if_
     best_train_epoch = 0;
     learn_rate = lr_sched->get_rate();
     epoch = 1;			// Epochs are numbered starting from 1.
-
+    //cerr << mlp->size_layer((QN_LayerSelector) 0) << endl; 
+    /*QN_readwrite_weights(debug, dbgname, *mlp,
+				 "MLP", wfile_format,
+				 QN_WRITE, NULL, NULL, mbt_params.num_basis);
+    */
+    //exit(0);
     while (learn_rate!=0.0f)	// Iterate over all epochs.
     {
 	float train_error;	// Percentage error on current training.
@@ -232,7 +291,8 @@ QN_HardSentTrainer::train(const char *lr_ctr, struct MapStruct *mapptr, bool if_
 	train_lab_str->rewind();
 	percent_correct = train_epoch(mapptr);	//cz277 - outmap
 	train_error = 100.0f - percent_correct;
-	if (train_error < best_train_error)
+	//exit(0);
+        if (train_error < best_train_error)
 	{
 	    best_train_error = train_error;
 	    best_train_epoch = epoch;
@@ -244,6 +304,8 @@ QN_HardSentTrainer::train(const char *lr_ctr, struct MapStruct *mapptr, bool if_
 	// Cross validation phase.
 	cv_ftr_str->rewind();
 	cv_lab_str->rewind();
+
+
 	percent_correct = cv_epoch(lr_ctr, mapptr);	//cz277 - outmap	//cz277 - learn rate criterion
 	cv_error = 100.0f - percent_correct;
 
@@ -254,7 +316,7 @@ QN_HardSentTrainer::train(const char *lr_ctr, struct MapStruct *mapptr, bool if_
 	    "`%s\'.", last_weightlog_filename);
 	    QN_readwrite_weights(debug, dbgname, *mlp,
 				 last_weightlog_filename, wfile_format,
-				 QN_READ);
+				 QN_READ, NULL, NULL, mbt_params.num_basis);
 	}
 	else
 	{
@@ -271,7 +333,7 @@ QN_HardSentTrainer::train(const char *lr_ctr, struct MapStruct *mapptr, bool if_
 	    QN_OUTPUT("Weight log: Saving weights to `%s\'.",
 		      last_weightlog_filename);
 	    QN_readwrite_weights(debug,dbgname, *mlp,
-				 last_weightlog_filename, wfile_format, QN_WRITE);
+	    			 last_weightlog_filename, wfile_format, QN_WRITE, NULL, NULL, mbt_params.num_basis);
 	    last_cv_error = cv_error;
 	    best_cv_error = cv_error;
 	    best_cv_epoch = epoch;
@@ -362,16 +424,16 @@ QN_HardSentTrainer::cv_epoch(const char *lr_ctr, struct MapStruct *mapptr, bool 
         
         //cw564 - mbt
         //cerr << lab_buf[0] << endl;
-        float* * spkr_wgt_buf = new float*[lab_count];
+        concat_raw_inp_buf(inp_buf, ftr_count, cv_ftr_str->num_ftrs(), mbt_params.num_basis);
         convert_raw_lab_buf(lab_buf, spkr_wgt_buf, lab_count);
         //cerr << lab_buf[0] << '\t' << spkr_wgt_buf[0]  << '\t' 
         //    << spkr_wgt_buf[0][0] << '\t' << spkr_wgt_buf[0][1] << endl; exit(0);
 
-
 	// Do the forward pass.
-	mlp->forward(ftr_count, inp_buf, out_buf);
+        //cerr << mbt_params.num_basis << endl;
+	mlp->forward(ftr_count, inp_buf, out_buf, spkr_wgt_buf, mbt_params.num_basis);
+
 	
-        delete [] spkr_wgt_buf;
 
 	// Analyze the output of the net.
 	float* out_buf_ptr = out_buf; // Current output frame.
@@ -550,9 +612,8 @@ QN_HardSentTrainer::train_epoch(struct MapStruct *mapptr, bool if_mbt) //cw564 -
 	}
         
         //cw564 - mbt
-        float* * spkr_wgt_buf = new float*[lab_count];
         convert_raw_lab_buf(lab_buf, spkr_wgt_buf, lab_count);
-
+        concat_raw_inp_buf(inp_buf, ftr_count, cv_ftr_str->num_ftrs(), mbt_params.num_basis);
 
 	// Check that the label stream is good and build up the target vector.
 	qn_copy_f_vf(ftr_count*mlp_outs, targ_low, targ_buf);
@@ -613,7 +674,7 @@ QN_HardSentTrainer::train_epoch(struct MapStruct *mapptr, bool if_mbt) //cw564 -
 	}
 
 	// Do the training.
-	mlp->train(trn_count, inp_buf, targ_buf, out_buf);
+	mlp->train(trn_count, inp_buf, targ_buf, out_buf, spkr_wgt_buf, mbt_params.num_basis);
 
 	// Analyze the output of the net.
 	float* out_buf_ptr = out_buf; // Current output frame.
@@ -742,7 +803,7 @@ QN_HardSentTrainer::checkpoint_weights()
     QN_OUTPUT("Checkpoint: Saving weights to `%s\'.",
 	      ckpt_filename);
     QN_readwrite_weights(debug,dbgname, *mlp,
-			 ckpt_filename, ckpt_format, QN_WRITE);
+			 ckpt_filename, ckpt_format, QN_WRITE, NULL, NULL, mbt_params.num_basis);
 
 }
 

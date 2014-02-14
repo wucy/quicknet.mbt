@@ -28,7 +28,8 @@ public:
     // see if they are consistent
     QN_MLPWeightFile_Matlab(int a_dbg, const char* a_dbgname, FILE* a_stream,
 			    QN_FileMode a_mode, size_t a_layers,
-			    const size_t* a_layer_units = NULL);
+			    const size_t* a_layer_units = NULL,
+                            int num_basis = 1);
     virtual ~QN_MLPWeightFile_Matlab();
 
     // How many layers are there?
@@ -96,7 +97,8 @@ private:
     };
     struct MatInfo minfo[QN_MAX_SECTIONS]; // Info on the matrices on disk.
     enum { QN_MAXNAMLEN = 32 };	// The maximum matrix name length.
-
+    
+    int num_basis; //cw564 - mbt
 };
 
 #endif

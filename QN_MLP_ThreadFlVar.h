@@ -42,11 +42,11 @@ public:
 
 private:
     // Forward pass one frame
-    void forward_bunch(size_t n_frames, const float* in, float* out);
+    void forward_bunch(size_t n_frames, const float* in, float* out, const float * * w = NULL, const size_t n = 1);
 
     // Train one frame
     void train_bunch(size_t n_frames, const float* in, const float* target,
-		     float* out);
+		     float* out, const float * * w = NULL, const size_t n = 1);
 
     
     // The actions for the worker threads

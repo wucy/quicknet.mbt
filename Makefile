@@ -63,7 +63,7 @@ INSTALL_LIB = $(INSTALL_DATA)
 
 CPPFLAGS = 
 CFLAGS = -g -O2
-CXXFLAGS = -g -O2
+CXXFLAGS = -g -O2 -fpermissive
 NVCCFLAGS = 
 LDFLAGS = -L/usr/local/cuda-5.5/lib -Wl,-rpath=/usr/local/cuda-5.5/lib -L/usr/local/cuda-5.5/lib64 -Wl,-rpath=/usr/local/cuda-5.5/lib64 
 LIBS = -lpthread -lm -lcublas -lcudart 

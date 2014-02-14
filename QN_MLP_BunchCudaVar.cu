@@ -159,7 +159,9 @@ QN_MLP_BunchCudaVar::QN_MLP_BunchCudaVar(int a_bp_num_layer,	//cz277 - nn fea bp
     }
     dev_weights_stale = QN_TRUE;
     host_weights_stale = QN_FALSE;
-
+    
+    dev.cache_raw_last2_y = new float[300000000]; //cw564 - mbt -- TODO
+    dev.cache_weights = new float[300000000]; //cw564 - mbt -- TODO
 }
 
 QN_MLP_BunchCudaVar::~QN_MLP_BunchCudaVar()
@@ -206,19 +208,25 @@ QN_MLP_BunchCudaVar::~QN_MLP_BunchCudaVar()
     
     //cz277 - fast softmax
     devfree_vf("compcache", dev.compcache);
+
+    //cw564 - mbt
+    delete [] dev.cache_raw_last2_y;
+    delete [] dev.cache_weights;
 }
 
 
 
 void
-QN_MLP_BunchCudaVar::forward_bunch(size_t n_frames, const float* in, float* out)
+QN_MLP_BunchCudaVar::forward_bunch(size_t n_frames, const float* in, float* out, const float * * spkr_wgt, const size_t num_basis)
 {
+
 //    printf("in=%x, out=%x\n", in, out);
 
     // Copy the data across to the device
     int in_size = n_frames * layer_units[0];
     int out_size = n_frames * layer_units[n_layers-1];
     todev_vf_vf("forward_bunch().in", in_size, in, dev.in);
+
 
     size_t cur_layer;		// The index of the current layer.
     size_t prev_layer;		// The index of the previous layer.
@@ -229,7 +237,7 @@ QN_MLP_BunchCudaVar::forward_bunch(size_t n_frames, const float* in, float* out)
     float* cur_layer_x;		// Input to the current layer non-linearity.
     float* cur_layer_y;		// Output from the current layer
 				// non-linearity.
-    const float* prev_layer_y;	// Output from the previous non-linearity.
+    float* prev_layer_y;	// Output from the previous non-linearity.
     float* cur_layer_bias;	// Biases for the current layer.
     float* cur_weights;		// Weights inputing to the current layer.
 
@@ -238,31 +246,65 @@ QN_MLP_BunchCudaVar::forward_bunch(size_t n_frames, const float* in, float* out)
     // Note that layer index starts at 0 for inputlayer, so we start at 1.
     for (cur_layer=1; cur_layer<n_layers; cur_layer++)
     {
-	prev_layer = cur_layer - 1;
-	cur_weinum = cur_layer - 1;
-	cur_layer_units = layer_units[cur_layer];
-	prev_layer_units = layer_units[prev_layer];
-	cur_layer_size = cur_layer_units * n_frames;
-	cur_layer_x = dev.layer_x[cur_layer];
-	cur_layer_y = dev.layer_y[cur_layer];
-	if (cur_layer==1)
-	    prev_layer_y = dev.in;
-	else
-	    prev_layer_y = dev.layer_y[prev_layer];
-	cur_layer_bias = dev.layer_bias[cur_layer];
-	cur_weights = dev.weights[cur_weinum];
+        prev_layer = cur_layer - 1;
+        cur_weinum = cur_layer - 1;
+        cur_layer_units = layer_units[cur_layer];
+        prev_layer_units = layer_units[prev_layer];
+        cur_layer_size = cur_layer_units * n_frames;
+        cur_layer_x = dev.layer_x[cur_layer];
+        cur_layer_y = dev.layer_y[cur_layer];
+        if (cur_layer==1)
+            prev_layer_y = dev.in;
+        else if (cur_layer == n_layers - 1) //cw564 - mbt
+        {
+            float * h_cache_prev_layer_y = dev.cache_raw_last2_y;
+            float * d_prev_layer_y = dev.layer_y[prev_layer];
+            fromdev_vf_vf("mbt.ori_prev_layer_y", prev_layer_units * n_frames, 
+                    d_prev_layer_y, h_cache_prev_layer_y);
 
-	if (checking)
-	    devcheck("forward_bunch #1");
-	//cz277 - fast softmax
-	qn_dev_fastcopy_vf_mf(n_frames, cur_layer_units, cur_layer_bias, cur_layer_x);
-	//qn_dev_copy_vf_mf(n_frames, cur_layer_units, cur_layer_bias,
-	//		    cur_layer_x);
-	if (checking)
-	    devcheck("forward_bunch #2");
-	qn_dev_mulntacc_mfmf_mf(n_frames, prev_layer_units, cur_layer_units,
-				prev_layer_y, cur_weights,
-				cur_layer_x); 
+
+            int old_prev_layer_units = prev_layer_units;
+            prev_layer_units /= num_basis;
+
+            float * h_wsum_prev_layer_y = new float[prev_layer_units * n_frames];
+            //TODO fast summation
+            for (int ff = 0; ff < n_frames; ++ ff)
+            {
+                for (int now_dim = 0; now_dim < prev_layer_units; ++ now_dim)
+                {
+                    int new_id = ff * prev_layer_units + now_dim;
+                    h_wsum_prev_layer_y[new_id] = 0;
+                    for (int bb = 0; bb < num_basis; ++ bb)
+                    {
+                        int old_id = ff * old_prev_layer_units + bb * prev_layer_units + now_dim;
+                        h_wsum_prev_layer_y[new_id] += h_cache_prev_layer_y[old_id] * spkr_wgt[ff][bb];
+                    }
+                }
+            }
+            todev_vf_vf("mbt.new_prev_layer_y", prev_layer_units * n_frames, 
+                    h_wsum_prev_layer_y, d_prev_layer_y);
+            delete [] h_wsum_prev_layer_y;
+
+            prev_layer_y = d_prev_layer_y;
+        }
+        else
+            prev_layer_y = dev.layer_y[prev_layer];
+        cur_layer_bias = dev.layer_bias[cur_layer];
+        cur_weights = dev.weights[cur_weinum];
+
+        if (checking)
+            devcheck("forward_bunch #1");
+        //cz277 - fast softmax
+        qn_dev_fastcopy_vf_mf(n_frames, cur_layer_units, cur_layer_bias, cur_layer_x);
+        //qn_dev_copy_vf_mf(n_frames, cur_layer_units, cur_layer_bias,
+        //		    cur_layer_x);
+        if (checking)
+            devcheck("forward_bunch #2");
+        qn_dev_mulntacc_mfmf_mf(n_frames, prev_layer_units, cur_layer_units,
+                prev_layer_y, cur_weights,
+                cur_layer_x); 
+
+
 	if (checking)
 	    devcheck("forward_bunch #3");
 	
@@ -336,10 +378,10 @@ QN_MLP_BunchCudaVar::forward_bunch(size_t n_frames, const float* in, float* out)
 
 void
 QN_MLP_BunchCudaVar::train_bunch(size_t n_frames, const float *in,
-				 const float* target, float* out)
+				 const float* target, float* out, const float * * spkr_wgt, const size_t num_basis)
 {
 // First move forward, which copies over in and out
-    forward_bunch(n_frames, in, out);
+    forward_bunch(n_frames, in, out, spkr_wgt, num_basis);
     if (checking)
 	devcheck("train_bunch #0");
 
@@ -375,14 +417,31 @@ QN_MLP_BunchCudaVar::train_bunch(size_t n_frames, const float *in,
     //cz277 - nn fea bp
     int bp_num_layer_idx = this->bp_num_layer;
 
+    //cw564 - mbt
+    float * z_spkr = new float[n_frames];
+    for (int ff = 0; ff < n_frames; ++ ff)
+    {
+        z_spkr[ff] = 0;
+	for (int bb = 0; bb < num_basis; ++ bb) z_spkr[ff] += spkr_wgt[ff][bb];
+    }
+
     // Iterate back over all layers but the first.
     for (cur_layer=n_layers-1; cur_layer>0 && (bp_num_layer_idx != 0); cur_layer--, --bp_num_layer_idx)	//cz277 - nn fea bp
     {
+
 	prev_layer = cur_layer - 1;
 	cur_weinum = cur_layer - 1;
 	cur_layer_units = layer_units[cur_layer];
 	prev_layer_units = layer_units[prev_layer];
 	cur_layer_size = cur_layer_units * n_frames;
+
+	//cw564 - mbt
+	if (cur_layer == n_layers - 2)
+	{
+	    todev_vf_vf("mbt.raw_cur_layer_last2_y", cur_layer_size, 
+                    dev.cache_raw_last2_y, dev.layer_y[cur_layer]);
+	}
+	
 	cur_layer_y = dev.layer_y[cur_layer];
 	if (cur_layer==1)
 	    prev_layer_y = dev.in;
@@ -502,26 +561,96 @@ QN_MLP_BunchCudaVar::train_bunch(size_t n_frames, const float *in,
 	// Back propogate error through this layer.
 	if (cur_layer!=1 && backprop_weights[cur_weinum])
 	{
-	    qn_dev_mul_mfmf_mf(n_frames, cur_layer_units, prev_layer_units,
+	
+	//cw564 - mbt
+	if (cur_layer == n_layers - 1)
+		prev_layer_units = prev_layer_units / num_basis;
+
+	qn_dev_mul_mfmf_mf(n_frames, cur_layer_units, prev_layer_units,
 			   cur_layer_dedx, cur_weights, prev_layer_dedy);
-	    if (checking)
-		devcheck("train_bunch #12");
+
+
+	
+	//cw564 - mbt -- prev_layer_dedy
+        if (cur_layer == n_layers - 1)
+	{
+	    int size = n_frames * prev_layer_units;
+	    float * h_raw_prev_layer_dedy = new float[size];
+	    float * h_new_prev_layer_dedy = new float[size * num_basis];
+
+	    fromdev_vf_vf("raw_prev_layer_dedy", size, prev_layer_dedy, h_raw_prev_layer_dedy);
+
+	    int cnt = 0;
+	    for (int ff = 0; ff < n_frames; ++ ff)
+	    {
+	        for (int bb = 0; bb < num_basis; ++ bb)
+		{
+		    for (int dd = 0; dd < prev_layer_units; ++ dd)
+	            {
+		        h_new_prev_layer_dedy[cnt] = 
+			    h_raw_prev_layer_dedy[ff * prev_layer_units + dd] * spkr_wgt[ff][bb] / z_spkr[ff];
+			cnt ++;
+                    }
+		}
+	    }
+
+	    int new_size = size * num_basis;
+	    todev_vf_vf("new_prev_layer_dedy", new_size, h_new_prev_layer_dedy, prev_layer_dedy);
+	    delete [] h_raw_prev_layer_dedy;
+	    delete [] h_new_prev_layer_dedy;
+	}
+
+	if (checking)
+	    devcheck("train_bunch #12");
+	
 	}
 	// Update weights.
 	if (cur_neg_weight_learnrate!=0.0f)
 	{
+
+
 	    //cz277 - momentum
 	    qn_dev_multnacc2_fmfmf_mf(n_frames, cur_layer_units, prev_layer_units,
 			    cur_neg_weight_learnrate, alpha_momentum, cur_layer_dedx,
-			    prev_layer_y, cur_weights_delta);							//weights_delta[tau] = -eta * partial_E_div_partial_weights + alpha * weights_delta[tau - 1]
+			    prev_layer_y, cur_weights_delta);
+	    //weights_delta[tau] = -eta * partial_E_div_partial_weights + alpha * weights_delta[tau - 1]
 
 	    //cz277 - weight decay	
 	    qn_dev_mulacc_vff_vf(cur_layer_units * prev_layer_units, cur_weights, cur_neg_weight_learnrate * weight_decay_factor, cur_weights_delta);	//weights_delta[tau] = -yita * nu * weights[tau] + weights_delta[tau]
 
-	    qn_dev_mulacc_vff_vf(cur_layer_units * prev_layer_units, cur_weights_delta, 1.0, cur_weights);	//weights[tau + 1] = weights[tau] + weights_delta[tau]		
-	    //qn_dev_multnacc_fmfmf_mf(n_frames, cur_layer_units, prev_layer_units,
-            //                     cur_neg_weight_learnrate, cur_layer_dedx,
-            //                     prev_layer_y, cur_weights);
+
+    	    
+	    qn_dev_mulacc_vff_vf(
+                    cur_layer_units * prev_layer_units, 
+                    cur_weights_delta, 1.0, 
+                    cur_weights);	//weights[tau + 1] = weights[tau] + weights_delta[tau]		
+	    	    
+	    //cw564 - mbt -- TODO BEGIN set zero to entries not in diag-blocks
+            if (cur_layer <= n_layers - 2)
+            {
+	        int weight_size = cur_layer_units * prev_layer_units;
+	        float * h_cur_weights = dev.cache_weights;
+	        fromdev_vf_vf("weights", weight_size, cur_weights, h_cur_weights);
+	        for (int i = 0; i < weight_size; ++ i)
+                {
+                    int col = i % prev_layer_units;
+                    int row = i / prev_layer_units;
+                    int one_base_col_size = prev_layer_units / num_basis;
+                    int one_base_row_size = cur_layer_units / num_basis;
+                    int k = min(col / one_base_col_size, row / one_base_row_size);
+                    int base_col = col - k * one_base_col_size;
+                    int base_row = row - k * one_base_row_size;
+		    if (base_col >= one_base_col_size || base_row >= one_base_row_size)
+		    {
+		        h_cur_weights[i] = 0;
+		    }
+	        }
+	        todev_vf_vf("new_weights", weight_size, h_cur_weights, cur_weights);
+            }
+	    //cw564 - mbt -- TODO END set zero to entries not in diag-blocks
+
+		
+    
 	    if (checking)
 		devcheck("train_bunch #13");
 	}
@@ -554,18 +683,18 @@ QN_MLP_BunchCudaVar::train_bunch(size_t n_frames, const float *in,
 }
 
 void
-QN_MLP_BunchCudaVar::forward(size_t n_frames, const float* in, float* out)
+QN_MLP_BunchCudaVar::forward(size_t n_frames, const float* in, float* out, const float * * wgt, const size_t num_basis)
 {
     refresh_dev_weights();
-    QN_MLP_BaseFl::forward(n_frames, in, out);
+    QN_MLP_BaseFl::forward(n_frames, in, out, wgt, num_basis);
 }
 
 void
 QN_MLP_BunchCudaVar::train(size_t n_frames, const float* in,
-			   const float* target, float* out)
+			   const float* target, float* out, const float * * wgt, const size_t num_basis)
 {
     refresh_dev_weights();
-    QN_MLP_BaseFl::train(n_frames, in, target, out);
+    QN_MLP_BaseFl::train(n_frames, in, target, out, wgt, num_basis);
     host_weights_stale = QN_TRUE;
 }
 

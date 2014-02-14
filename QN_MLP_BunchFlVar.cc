@@ -131,7 +131,8 @@ QN_MLP_BunchFlVar::~QN_MLP_BunchFlVar()
 
 
 void
-QN_MLP_BunchFlVar::forward_bunch(size_t n_frames, const float* in, float* out)
+QN_MLP_BunchFlVar::forward_bunch(size_t n_frames, const float* in, float* out, 
+        const float * * spkr_wgt, const size_t num_basis)
 {
     size_t cur_layer;		// The index of the current layer.
     size_t prev_layer;		// The index of the previous layer.
@@ -254,7 +255,7 @@ QN_MLP_BunchFlVar::forward_bunch(size_t n_frames, const float* in, float* out)
 
 void
 QN_MLP_BunchFlVar::train_bunch(size_t n_frames, const float *in,
-			       const float* target, float* out)
+			       const float* target, float* out, const float * * spkr_wgt, const size_t num_basis)
 {
 // First move forward
     forward_bunch(n_frames, in, out);

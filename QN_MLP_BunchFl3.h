@@ -22,16 +22,16 @@ public:
     size_t num_sections() const { return 4; };
     size_t size_layer(QN_LayerSelector layer) const;
     void size_section(QN_SectionSelector section, size_t* ouput_p,
-		      size_t* input_p) const;
+		      size_t* input_p, size_t num_basis = 1) const; //cw564
     size_t num_connections() const;
 
     // Find out the bunch size (not part of the abstract interface)
     size_t get_bunchsize();
 
     // Use and train.
-    void forward(size_t n_frames, const float* in, float* out);
+    void forward(size_t n_frames, const float* in, float* out, const float * * wgt, const size_t n);
     void train(size_t n_frames, const float* in, const float* target,
-	       float* out);
+	       float* out, const float * * wgt, const size_t n);
 
     // Access weights.
     void set_weights(enum QN_SectionSelector which,

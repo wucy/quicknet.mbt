@@ -49,14 +49,14 @@ public:
 
     // What is the size of the given section - outputs and inputs
     virtual void size_section(QN_SectionSelector section, size_t* ouput_p,
-			      size_t* input_p) const = 0;
+			      size_t* input_p, size_t num_basis = 1) const = 0;
     
 
     // Train and use
-    virtual void forward(size_t n_frames, const float *in, float *out) = 0;
+    virtual void forward(size_t n_frames, const float *in, float *out, const float * * wgt = NULL, const size_t num_basis = 1) = 0;
 
     virtual void train(size_t n_frames, const float* in, const float* target,
-    		       float* out) = 0;
+    		       float* out, const float * * wgt = NULL, const size_t num_basis = 1) = 0;
 
     // Access weights/biases - returned in output-major order (i.e. The second
     // weight returned is used to scale the second input to form the first
@@ -76,6 +76,8 @@ public:
     virtual void set_learnrate(enum QN_SectionSelector which,
 			       float learnrate) = 0;
     virtual float get_learnrate(enum QN_SectionSelector which) const = 0;
+
+    int mbt_num_basis;
 };
 
 #endif // #define QN_QN_MLP_h_INCLUDED

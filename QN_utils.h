@@ -99,21 +99,21 @@ void QN_readwrite_weights(int debug, const char* dbgname,
 			  const char* wfile_name,
 			  QN_WeightFileType wfile_format,
 			  QN_FileMode mode,
-			  float* minp = NULL, float* maxp = NULL);
+			  float* minp = NULL, float* maxp = NULL, size_t num_basis = 1);
 
 
 // A routine for reading or writing weights from a weightfile object.
 void QN_readwrite_weights(int debug, const char* dbgname,
 			  QN_FileMode mode, QN_MLPWeightFile& weights,
 			  QN_MLP& mlp, 
-			  float* minp = NULL, float* maxp = NULL);
+			  float* minp = NULL, float* maxp = NULL, size_t num_basis = 1);
 
 
 // Generic routine for reading a weight file into an MLP - thin
 // wrapper around QN_readwrite_weights.
 void QN_read_weights(QN_MLPWeightFile& wfile, QN_MLP& mlp,
 		     float* min, float* max, int debug = 0,
-		     const char* dbgname = NULL);
+		     const char* dbgname = NULL, size_t num_basis = 1);
 
 // Generic routine for writing a weight file from an MLP - thin wrapper around
 // QN_readwrite_weights.

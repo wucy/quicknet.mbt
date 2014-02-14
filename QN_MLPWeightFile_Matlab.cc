@@ -20,6 +20,9 @@ const char* QN_MLPWeightFile_Matlab_rcsid =
 #include "QN_fltvec.h"
 #include "QN_intvec.h"
 
+#include <iostream>
+using namespace std;
+
 const char* QN_MLPWeightFile_Matlab::sectname[] =
 {
     "weights12",
@@ -71,11 +74,13 @@ QN_MLPWeightFile_Matlab::QN_MLPWeightFile_Matlab(int a_debug,
 						 FILE* a_stream,
 						 QN_FileMode a_mode,
 						 size_t a_layers,
-						 const size_t* a_layer_units)
+						 const size_t* a_layer_units,
+                                                 const int a_num_basis)
     : clog(a_debug, "QN_MLPWeightFile_Matlab", a_dbgname),
       stream(a_stream),
       mode(a_mode),
-      n_layers(a_layers)
+      n_layers(a_layers),
+      num_basis(a_num_basis)
 {
     size_t i;
 
@@ -135,9 +140,11 @@ QN_MLPWeightFile_Matlab::QN_MLPWeightFile_Matlab(int a_debug,
 	// Now check the size of each matrix.
 	size_t file_n_sections = (file_n_layers-1) * 2;
 	size_t sect, lay;
-	for (sect = 0, lay = 0; sect<file_n_sections; sect+=2, lay++)
+	
+        
+        for (sect = 0, lay = 0; sect<file_n_sections; sect+=2, lay++)
 	{
-	    if ( (minfo[sect].cols!=file_layer_units[lay]) ||
+	    if ( //(minfo[sect].cols!=file_layer_units[lay]) || //cw564 - mbt -- TODO
 		 (minfo[sect].rows!=file_layer_units[lay+1]) ||
 		 (minfo[sect+1].cols!=file_layer_units[lay+1]) ||
 		 (minfo[sect+1].rows!=1) )
@@ -148,7 +155,9 @@ QN_MLPWeightFile_Matlab::QN_MLPWeightFile_Matlab(int a_debug,
 	    }
 		
 	}
-	// If constructor specifies number of layers, check file agress.
+        
+	
+        // If constructor specifies number of layers, check file agress.
 	if (a_layers!=0 && a_layers != file_n_layers)
 	{
 	    clog.error("Matlab Weight file constructor requested %lu layers, "
@@ -174,6 +183,7 @@ QN_MLPWeightFile_Matlab::QN_MLPWeightFile_Matlab(int a_debug,
 	}
 	// QN_WEIGHTS_UNKNOWN is used to signal start of file.
 	io_state = QN_WEIGHTS_UNKNOWN;
+        
 	seek_section_header();
     }
     else if (a_mode == QN_WRITE)
@@ -277,7 +287,7 @@ void QN_MLPWeightFile_Matlab::write_section_header()
 	{
 	    io_state = QN_LAYER45_WEIGHTS;
 	    rows = layer_units[4];
-	    cols = layer_units[3];
+	    cols = layer_units[3] / num_basis;
 	    io_count = rows * cols;
 	    name = sectname[6];
 	}

@@ -193,7 +193,7 @@ QN_MLP_ThreadFlVar::~QN_MLP_ThreadFlVar()
 
 
 void
-QN_MLP_ThreadFlVar::forward_bunch(size_t n_frames, const float* in, float* out)
+QN_MLP_ThreadFlVar::forward_bunch(size_t n_frames, const float* in, float* out, const float * * wgt, const size_t n)
 {
     clog.log(QN_LOG_PER_BUNCH, "forward_bunch sending ACTION_FORWARD.");
     action_n_frames = n_frames;
@@ -207,7 +207,7 @@ QN_MLP_ThreadFlVar::forward_bunch(size_t n_frames, const float* in, float* out)
 
 void
 QN_MLP_ThreadFlVar::train_bunch(size_t n_frames, const float *in,
-			     const float* target, float* out)
+			     const float* target, float* out, const float * * wgt, const size_t n)
 {
 
     clog.log(QN_LOG_PER_BUNCH, "train_bunch sending ACTION_TRAIN.");

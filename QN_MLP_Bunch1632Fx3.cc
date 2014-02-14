@@ -206,7 +206,7 @@ QN_MLP_Bunch1632Fx3::size_layer(QN_LayerSelector layer) const
 
 void
 QN_MLP_Bunch1632Fx3::size_section(QN_SectionSelector section, size_t* output_p,
-			       size_t* input_p) const
+			       size_t* input_p, size_t num_basis) const //cw564
 {
     switch(section)
     {

@@ -124,7 +124,7 @@ QN_MLP_BunchFl3::size_layer(QN_LayerSelector layer) const
 
 void
 QN_MLP_BunchFl3::size_section(QN_SectionSelector section, size_t* output_p,
-			      size_t* input_p) const
+			      size_t* input_p, size_t num_basis) const //cw564
 {
     switch(section)
     {
@@ -157,7 +157,7 @@ QN_MLP_BunchFl3::num_connections() const
 }
 
 void
-QN_MLP_BunchFl3::forward(size_t n_frames, const float* in, float* out)
+QN_MLP_BunchFl3::forward(size_t n_frames, const float* in, float* out, const float * * wgt, const size_t n)
 {
     size_t i;
     size_t frames_this_bunch;	// Number of frames to handle this bunch
@@ -174,7 +174,7 @@ QN_MLP_BunchFl3::forward(size_t n_frames, const float* in, float* out)
 
 void
 QN_MLP_BunchFl3::train(size_t n_frames, const float* in, const float* target,
-		    float* out)
+		    float* out, const float * * wgt, const size_t n)
 {
     size_t i;
     size_t frames_this_bunch;	// Number of frames to handle this bunch

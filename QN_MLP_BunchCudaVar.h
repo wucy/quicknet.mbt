@@ -37,7 +37,9 @@ struct QN_BunchCudaVar_Workspace
     float *layer_dydx[QN_MLP_MAX_LAYERS]; // Output sigmoid difference
     float *layer_dedx[QN_MLP_MAX_LAYERS]; // Feed back error term from output
     float *layer_delta_bias[QN_MLP_MAX_LAYERS]; // Output bias update 
-   
+
+    float * cache_raw_last2_y;//cw564 - mbt
+    float * cache_weights; //cw564 - mbt
     //cz277 - fast softmax
     float *compcache;
 };
@@ -54,9 +56,12 @@ public:
 		      int device_no,	//cz277 - device select
 		      const char *env_var4dev_id);	//cz277 - env var
     ~QN_MLP_BunchCudaVar();
-    void forward(size_t n_frames, const float* in, float* out);
+
+    void forward(size_t n_frames, const float* in, float* out,
+            const float * * wgt = NULL, const size_t num_basis = 1); //cw564
     void train(size_t n_frames, const float* in, const float* target,
-	       float* out);
+            float* out, const float * * wgt = NULL, const size_t num_basis = 1); //cw564
+  
     void set_weights(enum QN_SectionSelector which,
 		     size_t row, size_t col,
 		     size_t n_rows, size_t n_cols,
@@ -68,14 +73,14 @@ public:
 
 protected:
     // Forward pass one frame
-    void forward_bunch(size_t n_frames, const float* in, float* out);
+    void forward_bunch(size_t n_frames, const float* in, float* out,
+            const float * * spkr_wgt = NULL, const size_t num_basis = 1); //cw564 - mbt
 
     // Train one frame
     void train_bunch(size_t n_frames, const float* in, const float* target,
-		     float* out);
+		     float* out,
+                     const float * * spkr_wgt = NULL, const size_t num_basis = 1); //cw564 - mbt
 
-    
-    
 private:
     void refresh_dev_weights(void);
     void refresh_host_weights(void);
@@ -125,6 +130,7 @@ private:
 
     //cz277 - nn fea bp
     int bp_num_layer;
+
 };
 
 

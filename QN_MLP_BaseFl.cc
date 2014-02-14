@@ -12,6 +12,9 @@ const char* QN_MLP_BaseFl_rcsid =
 #include "QN_fltvec.h"
 #include "QN_intvec.h"
 
+#include <iostream>
+using namespace std;
+
 
 // A simple minimum routine
 
@@ -72,6 +75,7 @@ QN_MLP_BaseFl::QN_MLP_BaseFl(int a_debug, const char* a_dbgname,
     for (i = 0; i<n_layers; i++)
     {
 	size_t units = layer_units[i];
+        //cerr << units << '\t' << i << endl; //cw564 - mbt
 	size_t size = units * size_bunch;
 	if (units==0)
 	    clog.error("Failed trying to create an MLP with a 0 unit layer.");
@@ -233,7 +237,7 @@ QN_MLP_BaseFl::size_layer(QN_LayerSelector layer) const
 
 void
 QN_MLP_BaseFl::size_section(QN_SectionSelector section, size_t* output_p,
-			      size_t* input_p) const
+			      size_t* input_p, size_t num_basis) const
 {
     // Default to 0 for unavailable sections.
     size_t input = 0;
@@ -281,7 +285,8 @@ QN_MLP_BaseFl::size_section(QN_SectionSelector section, size_t* output_p,
 	if (n_layers>4)
 	{
 	    output = layer_units[4];
-	    input = layer_units[3];
+	    input = layer_units[3] / num_basis; //!!!TODO!!! cw564 - mbt
+            //cerr << input << endl; exit(0);
 	}
 	break;
     case QN_LAYER5_BIAS:
@@ -536,7 +541,8 @@ QN_MLP_BaseFl::get_bunchsize() const
 }
 
 void
-QN_MLP_BaseFl::forward(size_t n_frames, const float* in, float* out)
+QN_MLP_BaseFl::forward(size_t n_frames, const float* in, float* out, 
+        const float * * wgt, const size_t num_basis)
 {
     size_t i;
     size_t frames_this_bunch;	// Number of frames to handle this bunch
@@ -547,7 +553,7 @@ QN_MLP_BaseFl::forward(size_t n_frames, const float* in, float* out)
     {
 	frames_this_bunch = qn_min_zz_z(size_bunch, n_frames - i);
 	
-	forward_bunch(frames_this_bunch, in, out);
+	forward_bunch(frames_this_bunch, in, out, wgt, num_basis);
 	in += n_input * frames_this_bunch;
 	out += n_output * frames_this_bunch;
     }
@@ -555,7 +561,7 @@ QN_MLP_BaseFl::forward(size_t n_frames, const float* in, float* out)
 
 void
 QN_MLP_BaseFl::train(size_t n_frames, const float* in, const float* target,
-		    float* out)
+		    float* out, const float * * wgt, const size_t num_basis)
 {
     size_t i;
     size_t frames_this_bunch;	// Number of frames to handle this bunch
@@ -566,7 +572,7 @@ QN_MLP_BaseFl::train(size_t n_frames, const float* in, const float* target,
     for (i=0; i<n_frames; i+= size_bunch)
     {
 	frames_this_bunch = qn_min_zz_z(size_bunch, n_frames - i);
-	train_bunch(frames_this_bunch, in, target, out);
+	train_bunch(frames_this_bunch, in, target, out, wgt, num_basis);
 	in += n_input * frames_this_bunch;
 	out += n_output * frames_this_bunch;
 	target += n_output * frames_this_bunch;
@@ -1111,7 +1117,7 @@ QN_MLP_BaseFl::findweights(QN_SectionSelector which,
     size_t total_rows;		// The number of rows in the selected matrix
     size_t total_cols;		// The number of cols in the selected matrix
 
-    size_section(which, &total_rows, &total_cols);
+    size_section(which, &total_rows, &total_cols, mbt_num_basis);
     switch(which)
     {
     case QN_LAYER12_WEIGHTS:

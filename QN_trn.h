@@ -141,10 +141,13 @@ protected:
 				// on the value of learn_rate.
     void checkpoint_weights();	// Dump a checkpoint of the weights.
 
-
+    
+    float * * spkr_wgt_buf; //cw564 - mbt 
     MBT_Params mbt_params; //cw564 - mbt -- mbt parameters
     //cw564 - mbt -- decode the modified lab buffer and generate right lab_buf and spkr_wgt per frame
-    void convert_raw_lab_buf(QNUInt32 * lab_buf, float ** spkr_wgt_buf, const int count);
+    void convert_raw_lab_buf(QNUInt32 * lab_buf, float * * & spkr_wgt_buf, const int count);
+    //cw564 - mbt -- concat the input
+    void concat_raw_inp_buf(float * input_buf, const int count, const int raw_fea_dim, const int num_basis);
 };
 
 // A class for performing MLP training with soft targets.

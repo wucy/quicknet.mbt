@@ -43,17 +43,17 @@ public:
     virtual size_t num_sections() const { return n_sections; };
     virtual size_t size_layer(QN_LayerSelector layer) const;
     virtual void size_section(QN_SectionSelector section, size_t* ouput_p,
-			      size_t* input_p) const;
+			      size_t* input_p, size_t num_basis = 1) const;
     virtual size_t num_connections() const;
 
     // Find out the bunch size (not part of the abstract interface)
     virtual size_t get_bunchsize() const;
 
     // Use and train.
-    virtual void forward(size_t n_frames, const float* in, float* out);
+    virtual void forward(size_t n_frames, const float* in, float* out, const float * * wgt = NULL, const size_t num_basis = 1);
 
     virtual void train(size_t n_frames, const float* in, const float* target,
-		       float* out);
+		       float* out, const float * * wgt = NULL, const size_t num_basis = 1);
 
     // Access weights.
     virtual void set_weights(enum QN_SectionSelector which,
@@ -69,15 +69,16 @@ public:
     virtual void set_learnrate(enum QN_SectionSelector which, float rate);
     virtual float get_learnrate(enum QN_SectionSelector which) const;
 
+    
 protected:
     // Forward pass one frame
-    virtual void forward_bunch(size_t n_frames, const float* in, float* out)
-	= 0;
+    virtual void forward_bunch(size_t n_frames, const float* in, float* out,
+            const float * * spkr_wgt = NULL, const size_t num_basis = 1) = 0; //cw564 - mbt
 
     // Train one frame
     virtual void train_bunch(size_t n_frames, const float* in,
-			     const float* target, float* out)
-	= 0;
+			     const float* target, float* out,
+                             const float * * spkr_wgt = NULL, const size_t num_basis = 1) = 0; //cw564 - mbt
     
     // A routine to return details of a specific weight or bias section
     float* findweights(QN_SectionSelector which,

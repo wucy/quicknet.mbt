@@ -76,6 +76,9 @@ void srand48(long);
 #include "QN_MLPWeightFile_RAP3.h"
 #include "QN_MLPWeightFile_Matlab.h"
 
+#include <iostream>
+using namespace std;
+
 #ifdef QN_HAVE_ATLAS_BUILDINFO_H
 #define QN_HAVE_ATLAS_BUILDINFO
 #endif
@@ -576,7 +579,7 @@ QN_readwrite_weights(int debug, const char* dbgname,
 		     QN_MLP& mlp,
 		     const char* wfile_name, QN_WeightFileType wfile_format,
 		     QN_FileMode mode,
-		     float* minp, float* maxp)
+		     float* minp, float* maxp, size_t num_basis)
 {
     size_t i;
     FILE* wfile;	// Input/output weight file.
@@ -588,7 +591,9 @@ QN_readwrite_weights(int debug, const char* dbgname,
     size_t num_layers;
     size_t size_layers[QN_MLP_MAX_LAYERS];
 
+    //cerr << wfile_name << modestr << endl;
     wfile = QN_open(wfile_name, modestr);
+    //cerr << "hahaha" << endl;
     switch(wfile_format)
     {
     case QN_WEIGHTFILE_RAP3:
@@ -602,23 +607,30 @@ QN_readwrite_weights(int debug, const char* dbgname,
 	break;
     case QN_WEIGHTFILE_MATLAB:
 	num_layers = mlp.num_layers();
+        //cerr << mlp.size_layer((QN_LayerSelector) 0) << endl;
 	for (i=0; i<num_layers; i++)
 	    size_layers[i] = mlp.size_layer((QN_LayerSelector) i);
+            //cerr << size_layers[i] << endl;
+
+        //exit(0);
+
 	wf = new QN_MLPWeightFile_Matlab(debug, dbgname, wfile, mode,
-					 num_layers, size_layers);
+					 num_layers, size_layers, num_basis);
 	break;
     default:
 	assert(0);
     }
-    QN_readwrite_weights(debug, dbgname, mode, *wf, mlp, NULL, NULL);
+    QN_readwrite_weights(debug, dbgname, mode, *wf, mlp, NULL, NULL, num_basis);
     delete wf;
     QN_close(wfile);
 }
 
+//TODO
+
 void
 QN_readwrite_weights(int debug, const char* dbgname, QN_FileMode mode,
 		     QN_MLPWeightFile& weights, QN_MLP& mlp,
-		     float* minp, float* maxp)
+		     float* minp, float* maxp, size_t num_basis) //cw564
 {
     float min_weight = FLT_MAX;	// Minimum weight loaded
     float max_weight = -FLT_MAX; // Maximum weight loaded
@@ -668,8 +680,8 @@ QN_readwrite_weights(int debug, const char* dbgname, QN_FileMode mode,
 	
 	// The weight file determines the order of the sections
 	section = weights.get_weighttype(sectno);
-	// Find the size of the weight section we are dealing with
-	mlp.size_section(section, &num_outputs, &num_inputs);
+        // Find the size of the weight section we are dealing with
+	mlp.size_section(section, &num_outputs, &num_inputs, num_basis);
 	if (transpose)
 	{
 	    total_rows = num_inputs;
@@ -681,6 +693,9 @@ QN_readwrite_weights(int debug, const char* dbgname, QN_FileMode mode,
 	    total_cols = num_inputs;
 	}
 	
+        //TODO
+        //cerr << total_rows << '\t' << total_cols << '\n';
+
 	rows_in_chunk = buf_size/total_cols;
 	for (current_row=0; current_row<total_rows;
 	     current_row += rows_in_chunk)
@@ -708,6 +723,8 @@ QN_readwrite_weights(int debug, const char* dbgname, QN_FileMode mode,
 		    qn_trans_mf_mf(rows_in_current_chunk, total_cols, buf, buf2);
 		    mlp.set_weights(section, 0, current_row, total_cols,
 				    rows_in_current_chunk, buf2);
+                    /*cerr << current_row << '\t' << total_cols << '\t'
+                            << rows_in_current_chunk << endl;*/
 		}
 		else
 		{
@@ -717,9 +734,14 @@ QN_readwrite_weights(int debug, const char* dbgname, QN_FileMode mode,
 	    }
 	    else
 	    {
+                //cerr << "come to qnwrite" << endl;
+                //exit(0);
 		assert(mode==QN_WRITE);
 		if (transpose)
 		{
+                    //cerr << current_row << '\t' << total_cols << '\t'
+                    //       << rows_in_current_chunk << endl;
+
 		    mlp.get_weights(section, 0, current_row, total_cols,
 				    rows_in_current_chunk, buf2);
 		    qn_trans_mf_mf(total_cols, rows_in_current_chunk,
@@ -743,6 +765,7 @@ QN_readwrite_weights(int debug, const char* dbgname, QN_FileMode mode,
 	}
     }
 
+
     if (minp!=NULL)
 	*minp = min_weight;
     if (maxp!=NULL)
@@ -761,10 +784,11 @@ QN_readwrite_weights(int debug, const char* dbgname, QN_FileMode mode,
 void
 QN_read_weights(QN_MLPWeightFile& weights, QN_MLP& mlp,
 		float* minp, float* maxp, int debug,
-		const char* dbgname)
+		const char* dbgname, size_t num_basis = 1)
 {
     QN_readwrite_weights(debug, dbgname, QN_READ,
-			 weights, mlp, minp, maxp);
+			 weights, mlp, minp, maxp, num_basis);
+
 }
 
 // Write a weight file out from an MLP.
