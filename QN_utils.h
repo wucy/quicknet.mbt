@@ -119,7 +119,7 @@ void QN_read_weights(QN_MLPWeightFile& wfile, QN_MLP& mlp,
 // QN_readwrite_weights.
 void QN_write_weights(QN_MLPWeightFile& wfile, QN_MLP& mlp,
 		      float* min, float* max, int debug = 0,
-		      const char* dbgname = NULL);
+		      const char* dbgname = NULL, size_t num_basis = 1);
 
 
 // Randomize the weights and biases in an MLP

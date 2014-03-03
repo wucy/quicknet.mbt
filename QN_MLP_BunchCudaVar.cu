@@ -27,6 +27,16 @@ const char* QN_MLP_BunchCudaVar_rcsid =
 // __device__ void QN_BunchCudaVar_forward_bunch_do(QN_BunchCudaVar_Workspace *ws,
 //					      int n_frames);
 
+float * QN_MLP_BunchCudaVar::Last2_weights()
+{
+    fromdev_vf_vf("weights", 1000 * 2698, dev.weights[n_layers - 1], dev.cache_last2_weights); //cw564 - mbt -- TODO
+    return dev.cache_last2_weights;
+}
+
+float * QN_MLP_BunchCudaVar::Last_y()
+{
+    return dev.cache_raw_last2_y;
+}
 
 QN_MLP_BunchCudaVar::QN_MLP_BunchCudaVar(int a_bp_num_layer,	//cz277 - nn fea bp
 					 int a_debug,
@@ -162,6 +172,7 @@ QN_MLP_BunchCudaVar::QN_MLP_BunchCudaVar(int a_bp_num_layer,	//cz277 - nn fea bp
     
     dev.cache_raw_last2_y = new float[300000000]; //cw564 - mbt -- TODO
     dev.cache_weights = new float[300000000]; //cw564 - mbt -- TODO
+    dev.cache_last2_weights = new float[300000000];
 }
 
 QN_MLP_BunchCudaVar::~QN_MLP_BunchCudaVar()

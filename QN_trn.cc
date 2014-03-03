@@ -33,6 +33,8 @@ using std::string;
 using std::vector;
 using std::endl;
 
+
+
 //cw564 - mbt -- decode the modified lab buffer and generate right lab_buf and spkr_wgt per frame
 void
 QN_HardSentTrainer::convert_raw_lab_buf(QNUInt32 * lab_buf, float * * & spkr_wgt_buf, const int count)
@@ -76,12 +78,6 @@ QN_HardSentTrainer::concat_raw_inp_buf(
             }
         }
     }
-
-    //cerr << pos << endl;
-    //cerr << input_buf[129];
-    //cerr << cp_buf[129];
-    //exit(0);
-    
     delete [] cp_buf;
 }
 
@@ -268,12 +264,16 @@ QN_HardSentTrainer::train(const char *lr_ctr, struct MapStruct *mapptr, bool if_
     best_train_epoch = 0;
     learn_rate = lr_sched->get_rate();
     epoch = 1;			// Epochs are numbered starting from 1.
-    //cerr << mlp->size_layer((QN_LayerSelector) 0) << endl; 
-    /*QN_readwrite_weights(debug, dbgname, *mlp,
-				 "MLP", wfile_format,
-				 QN_WRITE, NULL, NULL, mbt_params.num_basis);
-    */
+    
+    //cv_ftr_str->rewind();
+    //cv_lab_str->rewind();
+    //train_ftr_str->rewind();
+    //train_lab_str->rewind();
+
+    //cw564 - mbt -- TODO
+    //lambda_epoch(lr_ctr, mapptr);
     //exit(0);
+
     while (learn_rate!=0.0f)	// Iterate over all epochs.
     {
 	float train_error;	// Percentage error on current training.
@@ -292,7 +292,7 @@ QN_HardSentTrainer::train(const char *lr_ctr, struct MapStruct *mapptr, bool if_
 	percent_correct = train_epoch(mapptr);	//cz277 - outmap
 	train_error = 100.0f - percent_correct;
 	//exit(0);
-        if (train_error < best_train_error)
+    if (train_error < best_train_error)
 	{
 	    best_train_error = train_error;
 	    best_train_epoch = epoch;
@@ -366,6 +366,265 @@ QN_HardSentTrainer::train(const char *lr_ctr, struct MapStruct *mapptr, bool if_
 	      total_time, hours, mins, secs);
     QN_OUTPUT("** ** ** ** ** ** ** ** ** ** ** ** ** **");
 }
+
+//cw564 - mbt - lambda_epoch
+double
+QN_HardSentTrainer::lambda_epoch(const char *lr_ctr, struct MapStruct *mapptr, bool if_mbt)
+{
+    vector< vector< float > > train_last_y;
+    vector< vector< float > > train_out;
+    vector< int > train_lab;
+
+    vector< vector< float > > W;
+    vector< float > b;
+
+    size_t correct_02e = 0;
+    size_t total_02e = 0;
+
+    size_t ftr_count;		// Count of feature frames read.
+    size_t lab_count;		// Count of label frames read.
+    size_t total_frames = 0;	// Total frames read this phase.
+    size_t correct_frames = 0;	// Number of correct frames this phase.
+    size_t reject_frames = 0;	// Numer of frames we reject.
+    size_t current_segno;	// Current segment number.
+    double start_secs;		// Exact time we started.
+    double stop_secs;		// Exact time we stopped.
+    size_t i;			// Local counter.
+
+    //cz277 - outmap
+    size_t map_correct_frames = 0;
+
+    current_segno = 0;
+    ftr_count = 0;		// Pretend that previous read hit end of seg.
+    start_secs = QN_time();
+   
+    // Iterate over all input segments.
+    // Note that, at this stage, an input segment is _not_ typically a
+    // sentence, but a buffer full of sentences (known as a "fill" in old
+    // QuickNet code).
+    while (1)
+    {
+	if (ftr_count<bunch_size) // Check if at end of segment.
+	{
+	    QN_SegID ftr_segid;	// Segment ID from input stream.
+	    QN_SegID lab_segid;	// Segment ID from label stream.
+
+	    ftr_segid = cv_ftr_str->nextseg();
+	    lab_segid = cv_lab_str->nextseg();
+	    assert(ftr_segid==lab_segid);
+	    if (ftr_segid==QN_SEGID_BAD)
+		break;
+	    else
+	    {
+		current_segno++;
+	    }
+	}
+
+	// Get the data to pass on to the net.
+	ftr_count = cv_ftr_str->read_ftrs(bunch_size, inp_buf);
+	lab_count = cv_lab_str->read_labs(bunch_size, lab_buf);
+       
+
+
+    if (ftr_count!=lab_count)
+	{
+	    clog.error("Feature and label streams have different segment "
+		       "lengths in cross validation.");
+	}
+        
+    //cw564 - mbt
+    float * raw_lab_buf = new float[lab_count];
+    for (int i = 0; i < lab_count; ++ i) raw_lab_buf[i] = lab_buf[i];
+       
+    //cw564 - mbt
+    //error!!
+    concat_raw_inp_buf(inp_buf, ftr_count, cv_ftr_str->num_ftrs(), mbt_params.num_basis);
+    convert_raw_lab_buf(lab_buf, spkr_wgt_buf, lab_count);
+
+	// Do the forward pass.
+	mlp->forward(ftr_count, inp_buf, out_buf, spkr_wgt_buf, mbt_params.num_basis);
+    cout << ftr_count << endl; 
+    float * last_y = mlp->Last_y();
+	float dim_per_item = mlp->size_layer((QN_LayerSelector) (mlp->num_layers()-2));
+    float dim_per_out = mlp->size_layer((QN_LayerSelector) (mlp->num_layers()-1));
+    int nowptr = 0;
+    int out_ptr = 0;
+    for (int i = 0; i < ftr_count; ++ i)
+    {
+        int now_lab = raw_lab_buf[i];
+        vector< float > vect;
+        for (int j = 0; j < dim_per_item; ++ j)
+        {
+            vect.push_back(last_y[nowptr]);
+            nowptr ++;
+        }
+        vector< float > out;
+        for (int j = 0; j < dim_per_out; ++ j)
+        {
+            out.push_back(out_buf[out_ptr]);
+            out_ptr ++;
+        } 
+        train_last_y.push_back(vect);
+        train_out.push_back(out);
+        train_lab.push_back(now_lab);
+    }
+
+	// Analyze the output of the net.
+	float* out_buf_ptr = out_buf; // Current output frame.
+	QNUInt32* lab_buf_ptr = lab_buf; // Current label.
+	QNUInt32 net_label;		// Label chosen by the net.
+	QNUInt32 cv_label;		// Label in cv stream.
+	for (int i=0; i<ftr_count; i++)
+	{
+            if (mbt_params.seg2spkr[raw_lab_buf[i] / 10000] == "02e")
+                total_02e ++;
+
+	    net_label = qn_imax_vf_u(mlp_outs, out_buf_ptr);
+	    cv_label = *lab_buf_ptr;
+	    if (cv_label >= (mlp_outs + lastlab_reject))
+	    {
+		clog.error("Label value of %lu in CV stream is "
+			   "larger than the number of output units.",
+			   (unsigned long) cv_label);
+	    }
+	    if (lastlab_reject && cv_label==mlp_outs)
+		reject_frames++;
+	    else if (net_label==cv_label) {
+                if (mbt_params.seg2spkr[raw_lab_buf[i] / 10000] == "02e")
+                {
+                    correct_02e ++;
+                }
+		correct_frames++;
+            }
+	    out_buf_ptr += mlp_outs;
+	    lab_buf_ptr++;
+	}
+	total_frames += ftr_count;
+
+        //cz277 - outmap
+    if (mapptr->opt > 0) 
+	{
+	    out_buf_ptr = out_buf;
+        lab_buf_ptr = lab_buf;
+        for (i=0; i<ftr_count; i++)
+        {
+		    if (mapptr->opt == 1) {	//max
+                net_label = mapptr->srclist[qn_imax_vf_u(mlp_outs, out_buf_ptr)];
+		    } else {	//sum
+		        memset(mapptr->tgtlist, 0.0, mapptr->tgtdim * sizeof(int));
+		        //printf("v == %f ", mapptr->tgtlist[0]);
+		        for (int j = 0; j != mapptr->srcdim; ++j) {
+			    //	printf("\t%f\n", out_buf_ptr[j]);
+		        mapptr->tgtlist[mapptr->srclist[j]] += out_buf_ptr[j];
+		        }
+		        if (mapptr->opt == 3) {	//avg
+			        for (int j = 0; j != mapptr->tgtdim; ++j) {
+			            mapptr->tgtlist[j] /= mapptr->tgtcnts[j];
+			        }
+		        }
+		        net_label = qn_imax_vf_u(mapptr->tgtdim, mapptr->tgtlist);
+		    }	
+            cv_label = mapptr->srclist[*lab_buf_ptr];
+
+            if (net_label==cv_label)
+                map_correct_frames++;
+            out_buf_ptr += mlp_outs;
+            lab_buf_ptr++;
+	    }
+
+    }
+        
+
+    delete [] raw_lab_buf;
+
+    }
+    stop_secs = QN_time();
+
+    //cerr << total_02e << ' ' << correct_02e << endl;
+   
+    //exit(0);
+    map<string, std::ofstream *> ofsfealab_map;
+    map<string, std::ofstream *> ofsout_map;
+
+    for (map<string, float *>::iterator it = mbt_params.spkr2wgt.begin(); 
+            it != mbt_params.spkr2wgt.end(); ++ it)
+    {
+        cout << it->first << endl;
+        string ofsfealabname = "workdir/" + it->first + "fealab";
+        string ofsoutname = "workdir/" + it->first + "out";
+        
+        std::ofstream * ofs = new std::ofstream(ofsfealabname.c_str());
+        ofsfealab_map[it->first] = ofs;
+
+        std::ofstream * ofs_out = new std::ofstream(ofsoutname.c_str());
+        ofsout_map[it->first] = ofs_out;
+    }
+
+    for (int i = 0; i < train_lab.size(); ++ i)
+    {
+        string myid = mbt_params.seg2spkr[train_lab[i] / 10000];
+        //girl:02e boy:02b cv:40l
+        //if (myid != "40l") continue;
+        std::ofstream & ofs = *(ofsfealab_map[myid]);
+        ofs << train_lab[i] % 10000;
+        for (int j = 0; j < train_last_y[i].size(); ++ j)
+        {
+            ofs << ' ' << train_last_y[i][j];
+        }
+        ofs << endl;
+        std::ofstream & outofs = *(ofsout_map[myid]);
+        for (int j = 0; j < train_out[i].size(); ++ j)
+        {
+            outofs << train_out[i][j] << ' ';
+        }
+        outofs << endl;
+    }
+
+    for (map<string, std::ofstream * >::iterator it = ofsfealab_map.begin(); it != ofsfealab_map.end(); ++ it)
+    {
+        it->second->close();
+        ofsfealab_map[it->first]->close();
+    }
+
+    exit(0);
+
+    double total_secs = stop_secs - start_secs;
+    size_t unreject_frames = total_frames - reject_frames;
+    double percent = 100.0 * (double) correct_frames / (double) unreject_frames; 
+
+    QN_OUTPUT("CV speed: %.2f MCPS, %.1f presentations/sec.",
+	      QN_secs_to_MCPS(stop_secs-start_secs, total_frames, *mlp),
+	      (double) total_frames / total_secs);
+    QN_OUTPUT("CV accuracy:  %lu right out of %lu, %.2f%% correct.",
+	      (unsigned long) correct_frames, (unsigned long) unreject_frames,
+	      percent);
+
+    //cz277 - outmap
+    if (mapptr->opt > 0) {
+	QN_OUTPUT("Mapped CV accuracy:  %lu right out of %lu, %.2f%% correct.",
+              (unsigned long) map_correct_frames, (unsigned long) unreject_frames,
+              100.0 * (double) map_correct_frames / (double) unreject_frames);
+    }
+
+    //cz277 - learn rate criterion
+    if (strcmp(lr_ctr, "mapped_cv") == 0) {
+        percent = 100.0 * (double) map_correct_frames / (double) unreject_frames;
+    }
+
+    if (lastlab_reject)
+    {
+	double percent_reject = 100.0
+		* (double)reject_frames / (double) total_frames;
+	QN_OUTPUT("CV reject frames: %lu of total %lu frames rejected, "
+		  "%.2f%% rejected.",
+		  (unsigned long) reject_frames,
+		  (unsigned long) total_frames,
+		  percent_reject);
+    }
+
+    return percent; 
+}
+
 
 // Note - cross validation is less demanding on the facilities that
 // must be provided by the stream.
@@ -605,6 +864,7 @@ QN_HardSentTrainer::train_epoch(struct MapStruct *mapptr, bool if_mbt) //cw564 -
 	// Get the data to pass on to the net.
 	ftr_count = train_ftr_str->read_ftrs(bunch_size, inp_buf);
 	lab_count = train_lab_str->read_labs(bunch_size, lab_buf);
+
 	if (ftr_count!=lab_count)
 	{
 	    clog.error("Feature and label streams have different segment "
@@ -675,6 +935,8 @@ QN_HardSentTrainer::train_epoch(struct MapStruct *mapptr, bool if_mbt) //cw564 -
 
 	// Do the training.
 	mlp->train(trn_count, inp_buf, targ_buf, out_buf, spkr_wgt_buf, mbt_params.num_basis);
+         
+
 
 	// Analyze the output of the net.
 	float* out_buf_ptr = out_buf; // Current output frame.
@@ -736,6 +998,7 @@ QN_HardSentTrainer::train_epoch(struct MapStruct *mapptr, bool if_mbt) //cw564 -
 	    checkpoint_weights();
 	}
     }
+
 
 
     stop_secs = QN_time();

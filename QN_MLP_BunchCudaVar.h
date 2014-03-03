@@ -39,6 +39,8 @@ struct QN_BunchCudaVar_Workspace
     float *layer_delta_bias[QN_MLP_MAX_LAYERS]; // Output bias update 
 
     float * cache_raw_last2_y;//cw564 - mbt
+    float * cache_last2_weights; //cw564 - mbt
+
     float * cache_weights; //cw564 - mbt
     //cz277 - fast softmax
     float *compcache;
@@ -70,6 +72,9 @@ public:
 		     size_t row, size_t col,
 		     size_t n_rows, size_t n_cols,
 		     float* weights);
+
+    virtual float * Last_y();
+    virtual float * Last2_weights();
 
 protected:
     // Forward pass one frame

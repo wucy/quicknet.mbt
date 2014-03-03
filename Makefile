@@ -548,19 +548,19 @@ all_man1srcs += $(srcdir)/qnstrn.man
 # The new, full-featured forward pass program
 ################################################################
 
-qnsfwd.o : $(srcdir)/qnsfwd.cc $(qnlib_hdrs) \
+#qnsfwd.o : $(srcdir)/qnsfwd.cc $(qnlib_hdrs) \
 					QN_config.h
-	$(compile.cc) -c $(srcdir)/qnsfwd.cc \
-		-o qnsfwd.o
+#	$(compile.cc) -c $(srcdir)/qnsfwd.cc \
+#		-o qnsfwd.o
 
-qnsfwd : qnsfwd.o $(qnlib_file)
-	$(LD) $(ldflags) -o qnsfwd qnsfwd.o $(qnlib_file) $(libs)
+#qnsfwd : qnsfwd.o $(qnlib_file)
+#	$(LD) $(ldflags) -o qnsfwd qnsfwd.o $(qnlib_file) $(libs)
 
-all_srcs += $(srcdir)/qnsfwd.cc
-all_objs += qnsfwd.o
-all_progs += qnsfwd
-all_man1pages += qnsfwd
-all_man1srcs += $(srcdir)/qnsfwd.man
+#all_srcs += $(srcdir)/qnsfwd.cc
+#all_objs += qnsfwd.o
+#all_progs += qnsfwd
+#all_man1pages += qnsfwd
+#all_man1srcs += $(srcdir)/qnsfwd.man
 
 
 ################################################################

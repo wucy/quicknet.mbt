@@ -1318,7 +1318,6 @@ qnmultitrn()
     
     mlp->mbt_num_basis = config.mbt_num_basis; //cw564 - mbt
 
-    //cerr << "!!!" << endl; exit(0);
 
     // Create the leaning rate schedule.
     QN_RateSchedule* lr_schedule;
@@ -1603,7 +1602,6 @@ qnmultitrn()
     } 
 
     
-
     if (hardtarget_train_str!=NULL)
     {
 	assert(hardtarget_cv_str!=NULL);
@@ -1611,7 +1609,6 @@ qnmultitrn()
         //cw564 - mbt
         map< string, float* > spkr_wgt = gen_spkwgt(config.mbt_init_lambda_file);
         map< int, string > seg2spkr = gen_seg2spk(config.mbt_seg2spkr_file);
-        //cerr << spkr_wgt[seg2spkr[1]][0] << endl; exit(0);
         MBT_Params mbt_params(seg2spkr, spkr_wgt, config.mbt_num_basis);
 	QN_HardSentTrainer* trainer =
 	    new QN_HardSentTrainer(debug,               // Debugging level.
@@ -1635,7 +1632,6 @@ qnmultitrn()
 				   lrmultipliers,         // Per-section LR scales.
                                    &mbt_params   //cw564 - mbt
 			       );
-
 	trainer->train(config.lr_ctr, &mapclass);	//cz277 - outmap
 	delete trainer;
     }
@@ -1733,6 +1729,7 @@ main(int argc, const char* argv[])
 
     FILE* log_fp;
     char log_buf[160];
+
 
 
     set_defaults();

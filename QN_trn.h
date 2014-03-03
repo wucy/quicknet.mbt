@@ -148,6 +148,8 @@ protected:
     void convert_raw_lab_buf(QNUInt32 * lab_buf, float * * & spkr_wgt_buf, const int count);
     //cw564 - mbt -- concat the input
     void concat_raw_inp_buf(float * input_buf, const int count, const int raw_fea_dim, const int num_basis);
+    //cw564 - mbt -- lambda tuning
+    double lambda_epoch(const char *, struct MapStruct *, bool if_mbt = false);
 };
 
 // A class for performing MLP training with soft targets.

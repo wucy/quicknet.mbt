@@ -795,10 +795,10 @@ QN_read_weights(QN_MLPWeightFile& weights, QN_MLP& mlp,
 void
 QN_write_weights(QN_MLPWeightFile& weights, QN_MLP& mlp,
 		float* minp, float* maxp, int debug,
-		const char* dbgname)
+		const char* dbgname, size_t num_basis = 1)
 {
     QN_readwrite_weights(debug, dbgname, QN_WRITE,
-			 weights, mlp, minp, maxp);
+			 weights, mlp, minp, maxp, num_basis);
 }
 
 

@@ -77,7 +77,11 @@ public:
 			       float learnrate) = 0;
     virtual float get_learnrate(enum QN_SectionSelector which) const = 0;
 
+
+    //cw564 - mbt
     int mbt_num_basis;
+    virtual float * Last_y() {return NULL;}
+    virtual float * Last2_weights() {return NULL;}
 };
 
 #endif // #define QN_QN_MLP_h_INCLUDED
